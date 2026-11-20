@@ -114,3 +114,32 @@ def test_openapi_describes_real_api(client):
     assert "patch" in schema["paths"]["/tasks/{task_id}"]
     assert "TaskCreate" in schema["components"]["schemas"]
     assert client.get("/docs").status_code == 200
+
+
+def test_get_and_delete_task(client):
+    create_response = client.post("/tasks", json={"title": "Купить молоко"})
+    assert create_response.status_code == 201
+    task_id = create_response.json()["id"]
+
+    get_response = client.get(f"/tasks/{task_id}")
+    assert get_response.status_code == 200
+    assert get_response.json()["title"] == "Купить молоко"
+
+    delete_response = client.delete(f"/tasks/{task_id}")
+    assert delete_response.status_code == 204
+    assert delete_response.content == b""  # Пустое тело
+
+    delete_again = client.delete(f"/tasks/{task_id}")
+    assert delete_again.status_code == 404
+
+    get_deleted = client.get(f"/tasks/{task_id}")
+    assert get_deleted.status_code == 404
+
+    list_response = client.get("/tasks")
+    ids = [task["id"] for task in list_response.json()]
+    assert task_id not in ids
+
+
+def test_unknown_task_id_returns_404(client):
+    assert client.get("/tasks/999").status_code == 404
+    assert client.delete("/tasks/999").status_code == 404

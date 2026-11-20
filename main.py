@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Path as PathParameter
+from fastapi import Depends, Response, FastAPI, HTTPException, Path as PathParameter
 from sqlalchemy import URL, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -76,7 +76,27 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         await session.refresh(saved_task)
         return saved_task
 
-    return app
 
+    @app.get("/tasks/{task_id}", response_model=TaskResponse, tags=["Задачи"])
+    async def get_task(
+        task_id: TaskId, session: AsyncSession = Depends(get_session)
+    ):
+        task = await session.get(Task, task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task
+
+    @app.delete("/tasks/{task_id}", status_code=204, tags=["Задачи"])
+    async def delete_task(
+        task_id: TaskId, session: AsyncSession = Depends(get_session)
+    ):
+        task = await session.get(Task, task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        await session.delete(task)
+        await session.commit()
+        return Response(status_code=204)
+
+    return app
 
 app = create_app()
